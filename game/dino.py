@@ -3,7 +3,7 @@ import settings
 
 class Dino(pygame.sprite.Sprite):
 
-    def __init__(self, x:int, y:int, width:int=40, height:int=60):
+    def __init__(self, x:int, y:int, width:int=settings.DINO_WIDTH, height:int=settings.DINO_HEIGHT):
         super().__init__()
 
         #APARENCIA 
