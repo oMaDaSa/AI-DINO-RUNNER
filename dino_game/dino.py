@@ -1,5 +1,5 @@
 import pygame
-import settings
+from . import settings
 
 class Dino(pygame.sprite.Sprite):
 

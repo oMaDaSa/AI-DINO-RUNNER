@@ -1,7 +1,7 @@
 import pygame
-import settings
-from dino import Dino
-from obstacle import Obstacle
+from . import settings
+from .dino import Dino
+from .obstacle import Obstacle
 
 class Game:
     def __init__(self, screen: pygame.Surface):
