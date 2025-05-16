@@ -1,22 +1,39 @@
 import pygame
-from . import settings
+import settings
 import random
 
 class Obstacle(pygame.sprite.Sprite):
     GLOBAL_SPEED = settings.OBSTACLE_SPEED
 
-    def __init__(self, width:int = settings.OBSTACLE_WIDTH, height:int=settings.OBSTACLE_HEIGHT, speed:float = settings.OBSTACLE_SPEED):
+    def __init__(self, is_flying=False, speed:float = settings.OBSTACLE_SPEED):
         super().__init__()
 
+        self.is_flying = is_flying
+
+        if is_flying:
+            self.width = settings.FLYING_OBSTACLE_WIDTH
+            self.height = settings.FLYING_OBSTACLE_HEIGHT
+        else:
+            self.width = settings.OBSTACLE_WIDTH
+            self.height = settings.OBSTACLE_HEIGHT
+
         #APARENCIA 
-        self.image = pygame.Surface([width, height])
+        self.image = pygame.Surface([self.width, self.height])
         self.image.fill(settings.OBSTACLE_GREEN)
+        if is_flying:
+            self.image.fill(settings.OBSTACLE_ORANGE)
+        else:
+            self.image.fill(settings.OBSTACLE_GREEN)
 
         #POSICAO
         self.rect = self.image.get_rect()
         self.rect.x = settings.SCREEN_WIDTH + random.randint(50, 200) # Spawn fora da tela, com uma variação
-        self.rect.bottom = settings.GROUND_LEVEL
+        if is_flying:
+            self.altitude = random.randint(settings.FLYING_OBSTACLE_ALTITUDE_MIN, settings.FLYING_OBSTACLE_ALTITUDE_MAX)
+        else:
+            self.altitude = 0
 
+        self.rect.bottom = settings.GROUND_LEVEL - self.altitude
         #MOVIMENTACAO
         self.speed = speed
         
@@ -63,7 +80,8 @@ if __name__ == '__main__':
         spawn_interval = max(300, settings.SPAWN_INTERVAL + Obstacle.GLOBAL_SPEED)
 
         if current_time - last_spawn >= spawn_interval:
-            new_obstacle = Obstacle()
+            is_flying = random.randint(0,1)
+            new_obstacle = Obstacle(is_flying = is_flying)
             obstacles.add(new_obstacle)
             last_spawn = current_time
 
