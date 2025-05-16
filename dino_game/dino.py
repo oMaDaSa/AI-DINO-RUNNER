@@ -1,5 +1,5 @@
 import pygame
-from . import settings
+import settings
 
 class Dino(pygame.sprite.Sprite):
 
@@ -7,31 +7,66 @@ class Dino(pygame.sprite.Sprite):
         super().__init__()
 
         #APARENCIA 
+        self.color = settings.DINO_PURPLE
         self.image = pygame.Surface([width, height])
-        self.image.fill(settings.DINO_PURPLE)
+        self.image.fill(self.color)
+        self.height = settings.DINO_HEIGHT
+        self.crouch_height = settings.DINO_CROUCH_HEIGHT
+        self.width = width
+
+        
 
         #POSICAO
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
         self.rect.bottom = settings.GROUND_LEVEL #inicia no chao
+        self.ground_y = y # Store original y position as ground level
 
         #MOVIMENTACAO
         self.velocity_y:float = 0
         self.is_jumping:bool = False
         self.on_ground:bool = True
+        self.is_crouching = False
 
         self._initial_x = x
         self._initial_y = settings.GROUND_LEVEL
 
-        self.width = width
-        self.height = height
 
     def jump(self):
-        if self.on_ground:
+        if self.on_ground and not self.is_crouching:
             self.velocity_y = -settings.JUMP_FORCE
             self.is_jumping = True
             self.on_ground = False
+            return True
+        return False
+    
+    def crouch(self):
+        if self.on_ground and not self.is_crouching and not self.is_jumping:
+            self.is_crouching = True
+            self.image = pygame.Surface([self.width, self.crouch_height])
+            self.image.fill(self.color)
+            # ajusta rect para manter a posição
+            bottom = self.rect.bottom
+            self.rect = self.image.get_rect()
+            self.rect.x = self._initial_x
+            self.rect.bottom = bottom
+            return True
+        return False
+
+    def stand(self):
+        if self.is_crouching:
+            self.is_crouching = False
+            self.image = pygame.Surface([self.width, self.height])
+            self.image.fill(self.color)
+            # ajusta rect para manter a posição
+            bottom = self.rect.bottom
+            self.rect = self.image.get_rect()
+            self.rect.x = self._initial_x
+            self.rect.bottom = bottom
+            return True
+        return False
+
 
     def update(self):
         if not self.on_ground:
@@ -56,6 +91,7 @@ class Dino(pygame.sprite.Sprite):
         self.velocity_y = 0
         self.is_jumping = False
         self.on_ground = True
+        self.is_crouching = False
 
 
 #testar colisao e pulo
@@ -76,6 +112,15 @@ if __name__ == '__main__':
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     dino.jump()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    dino.jump()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_DOWN:
+                    dino.crouch()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_DOWN:
+                    dino.stand()
 
         dino.update()
 
