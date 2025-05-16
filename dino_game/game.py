@@ -1,7 +1,8 @@
 import pygame
-from . import settings
-from .dino import Dino
-from .obstacle import Obstacle
+import settings
+from dino import Dino
+from obstacle import Obstacle
+import random
 
 class Game:
     def __init__(self, screen: pygame.Surface):
@@ -22,7 +23,8 @@ class Game:
         self.sprites.add(self.dino)
 
     def spawn_obstacle(self):
-        obstacle = Obstacle()
+        is_flying = random.randint(0,1)
+        obstacle = Obstacle(is_flying = is_flying)
         self.sprites.add(obstacle)
         self.obstacles.add(obstacle)
     
@@ -39,9 +41,15 @@ class Game:
                         self.running = False
                 return
 
-            if event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE or event.key == pygame.K_UP:
                     self.dino.jump()
+                elif event.key == pygame.K_DOWN:
+                    self.dino.crouch()
+
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_DOWN:
+                            self.dino.stand()
 
     def update_game_state(self):
         if self.game_over:
