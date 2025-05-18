@@ -1,10 +1,13 @@
 import pygame
+import sys
+import os
 
-import sys, os
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'dino_game')))
 
 import dino_game.settings as settings
 import dino_game.game as game
+import dino_game.train_ai as train_ai
 import ui.menu as menu
 
 class App:
@@ -16,8 +19,11 @@ class App:
         self.current_game_instance = None
         self.running = True
 
-    def play(self):
-        self.current_game_instance = game.Game(self.screen)
+    def play(self, gamemode):
+        if gamemode == "play":
+            self.current_game_instance = game.Game(self.screen)
+        elif gamemode == "train":
+            self.current_game_instance = train_ai.Training(self.screen)
         score = self.current_game_instance.run()
         self.current_game_instance = None
 
@@ -30,8 +36,8 @@ class App:
 
             if selected_action_key == "quit":
                 self.quit_game()
-            elif selected_action_key == "play":
-                self.play()
+            elif selected_action_key == "play" or selected_action_key == "train":
+                self.play(gamemode = selected_action_key)
             else:
                 pass 
 

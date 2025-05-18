@@ -45,12 +45,14 @@ class MainMenu:
         btn_width = 300
         btn_height = 60
         btn_spacing = 20
-        start_y = settings.SCREEN_HEIGHT // 2 - (4 * btn_height + 3 * btn_spacing) // 2 + 50
+        start_y = settings.SCREEN_HEIGHT // 2 - (3 * btn_height + 2 * btn_spacing) // 2
 
         self.buttons = [
-            Button("Play", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y, btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("play")),
+            Button("Play", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 0 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("play")),
 
-            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + btn_height + btn_spacing, btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
+            Button("Train Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 1 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("train")),
+
+            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
         ]
 
     def select_option(self, option_key: str):

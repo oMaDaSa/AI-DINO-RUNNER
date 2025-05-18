@@ -10,6 +10,7 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
+        self.last_spawn = pygame.time.get_ticks()
 
         self.running = False
         self.game_over = False
@@ -57,10 +58,15 @@ class Game:
 
         self.sprites.update()
 
-        self.obstacle_spawn_timer += 1
-        if self.obstacle_spawn_timer >= 100:
+        Obstacle.GLOBAL_SPEED -= settings.SPEED_INCREASE
+
+        spawn_interval = max(300, settings.SPAWN_INTERVAL + Obstacle.GLOBAL_SPEED)
+
+        current_time = pygame.time.get_ticks()
+
+        if current_time - self.last_spawn >= spawn_interval:
             self.spawn_obstacle()
-            self.obstacle_spawn_timer = 0 # Reset timer
+            self.last_spawn = current_time
             
         hit_obstacles = pygame.sprite.spritecollide(self.dino, self.obstacles, False, pygame.sprite.collide_rect)
         if hit_obstacles:
@@ -103,6 +109,7 @@ class Game:
         self.score = 0
         self.game_over = False
         self.obstacle_spawn_timer = 0
+        self.last_spawn = pygame.time.get_ticks()
 
         self.dino.reset()
         for obstacle in self.obstacles:
@@ -111,7 +118,7 @@ class Game:
     def run(self):
         self.running = True
         self.reset_game()
-
+        Obstacle.GLOBAL_SPEED = settings.OBSTACLE_SPEED
         while self.running:
             self.handle_input()     
             self.update_game_state() 
