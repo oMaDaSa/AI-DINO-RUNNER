@@ -4,6 +4,9 @@ from dino import Dino
 from obstacle import Obstacle
 import random
 import math
+import numpy as np
+import os
+import json
 
 class Training:
     def __init__(self, screen: pygame.Surface):
@@ -16,7 +19,6 @@ class Training:
         self.running = False
         self.game_over = False
         self.score = 0
-        self.high_score = 0 #TODO: implementar armazenamento
         
         #População
         self.population_size = settings.POPULATION_SIZE
@@ -26,19 +28,25 @@ class Training:
         self.best_fitness = 0
         self.generation = 1
 
-        #Detecção de obstaculos
+        #Q-values visualização
+        self.q_val_no_action = 0.0
+        self.q_val_jump = 0.0
+        self.q_val_crouch = 0.0    
+
+
+        #Detecção de obstáculos visualização
         self.obstacle_detection = {
             'ground_detected': False,
             'flying_detected': False,
             'ground_distance': float('inf'),
-            'flying_ditance': float('inf')
+            'flying_distance': float('inf')
         }
 
         self.sprites = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
 
         for i in range(self.population_size):
-            alpha = 25 #semi transparente
+            alpha = 50 #semi transparente
             dino = Dino(x = 50, y = settings.GROUND_LEVEL + 60, alpha = alpha, dino_id = i)
             self.dinos.add(dino)
             self.sprites.add(dino)
@@ -47,7 +55,53 @@ class Training:
         self.active_dino_count = self.population_size
         self.obstacle_spawn_timer = 0
 
-    def detect_obstacle(self, dino):
+        self.q_table = {}
+        self.epsilon = settings.EPSILON_INIT
+        self.current_episode = 0
+        self.episodes_this_session = 0
+        self.last_state = None
+        self.last_action = None
+        self.total_rewards = 0
+        self.q_table_file = "dino_q_table.json"
+        self.load_q_table()
+        self.distance_bin_edges = np.linspace(0, settings.RAY_LENGTH, settings.DISTANCE_BINS + 1)
+
+    def discretize_value(self, value, bin_edges):
+        idx = np.digitize(value, bin_edges[1:-1])
+        return idx
+
+    def get_state(self, dino=None):
+        if dino is None:
+            dino = self.dino
+        
+        state_components = []
+        for ray in  dino.rays:
+            dist = max(0, ray['distance'])
+            distance_bin = self.discretize_value(dist, self.distance_bin_edges)
+            state_components.append(distance_bin)
+
+            # (0: nenhum obstaculo, 1: obstaculo terreste, 2: obstaculo voador)
+            # Obstacle type component (0: no obstacle, 1: ground obstacle, 2: flying obstacle)
+            if not ray['hit']:
+                obstacle_type_value = 0
+            elif ray['obstacle_type'] == 'ground':
+                obstacle_type_value = 1
+            elif ray['obstacle_type'] == 'flying':
+                obstacle_type_value = 2
+            else:
+                obstacle_type_value = 0  # Default
+            
+            state_components.append(obstacle_type_value)
+
+        dino_vy_bin = self.discretize_value(dino.velocity_y, settings.VELOCITY_BINS)
+        game_speed_bin = self.discretize_value(Obstacle.GLOBAL_SPEED, settings.GAME_SPEED_BINS)
+        
+        state_components.extend([dino_vy_bin, game_speed_bin])
+
+        return tuple(state_components)
+    
+
+    def detect_obstacles(self, dino):
         ground_obstacle_detected = False
         flying_obstacle_detected = False
         closest_ground_obstacle_distance = float('inf')
@@ -55,7 +109,6 @@ class Training:
 
         for i, ray in enumerate(dino.rays):
             if ray['hit']:
-                angle = settings.RAY_ANGLES[i]
 
                 if ray['obstacle_type'] == 'ground':
                     ground_obstacle_detected = True
@@ -71,6 +124,38 @@ class Training:
             'ground_distance':closest_ground_obstacle_distance,
             'flying_distance':closest_flying_obstacle_distance,
         }
+    
+    def choose_action(self, state_tuple, dino=None):
+        if dino is None:
+            dino = self.dino
+
+        #pegar a informação dos obstaculos ao redor
+        obstacle_info = self.detect_obstacles(dino)
+
+        self.obstacle_detection = obstacle_info 
+
+        #pega os q_value pra esse estado
+        #0 = nada/ 1 = pulo/ 2 = agachar
+        q_values = self.q_table.get(state_tuple, [0.0, 0.0, 0.0])
+
+        # armazena para visualização
+        self.q_val_no_action = q_values[0]
+        self.q_val_jump = q_values[1]
+        self.q_val_crouch = q_values[2]
+
+        #exploração
+        if random.uniform(0, 1) < self.epsilon:
+            rand_val = random.random()
+            if rand_val < settings.EXPLORATION_JUMP_PROB:
+                return 1
+            elif rand_val < settings.EXPLORATION_JUMP_PROB + 0.05:
+                return 2
+            else:
+                return 0
+
+        # É possivel guiar o aprendizado, dando sugestões para uma fase inicial de treinamento (epsilon acima de um determinado valor)
+        # Não forçar a escolha, mas sugerir ela
+        return np.argmax(q_values)
 
     def spawn_obstacle(self):
         is_flying = random.randint(0,1)
@@ -82,44 +167,106 @@ class Training:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-
-            if self.game_over:
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_r: 
-                        self.reset_game()
-                    elif event.key == pygame.K_ESCAPE: 
-                        self.running = False
                 return
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.running = False
+                    return
+                
+            
+    def select_best_dinosaur(self):
+        best_fitness = 0
+        best_dino = None
+
+        for dino in self.dinos:
+            if dino.fitness > best_fitness:
+                best_fitness = dino.fitness
+                best_dino = dino
+            
+        if best_dino is not None:
+            self.best_dino = best_dino
+            self.best_fitness = best_fitness
+            if best_dino.q_table:
+                self.q_table = best_dino.q_table.copy()
+
+            print(f"Geração {self.generation}: Melhor dinossauro: {best_dino.id} com fitness {best_fitness}")
+
 
     def update_game_state(self):
         if self.active_dino_count == 0 or self.game_over:
+            self.select_best_dinosaur()
+            reward = -100.0
+            self.total_reward_this_episode += reward #penalidade por gameover
+
+            if self.last_state is not None:
+                current_q_values = self.q_table.get(self.last_state, [0.0, 0.0,][:])
+                old_q_value = current_q_values[self.last_action]
+                new_q_value = old_q_value + settings.ALPHA * (reward - old_q_value)
+                current_q_values[self.last_action] = new_q_value
+                self.q_table[self.last_state] = current_q_values
+            
+            #inicia uma nova geração
+            self.reset_game()
+            self.generation += 1
+            self.current_episode += 1
+            self.episodes_this_session += 1
+            self.epsilon = max(settings.EPSILON_MIN, self.epsilon * settings.EPSILON_DECAY)
+            self.last_state = None
+            self.last_action = None
+            self.total_reward_this_episode = 0
+
+            if self.episodes_this_session > 0 and self.episodes_this_session % 50 == 0:
+                self.save_q_table()
             return 
         
-
         for dino in self.dinos:
             if not dino.is_alive:
                 continue
             
             dino.cast_rays(self.obstacles)
+            current_state = self.get_state(dino)
 
-            choice = random.random()
-            if choice < 0.1: dino.jump()
-            elif choice < 0.3: dino.crouch()
-            else: dino.stand()
+            obstacle_info = self.detect_obstacles(dino)
 
+            #escalar as recompensas com a velocidade do jogo
+            speed_factor = min(1.0, abs(Obstacle.GLOBAL_SPEED) / 10)
+            reward = 0.05 + (0.05 * speed_factor)
+
+            #possivel aplicar recompensas mais extremas em casos como: pulou um obstaculo necessario
+
+            if obstacle_info['ground_distance'] == 0.0 or obstacle_info['flying_distance'] == 0.0:
+                reward -= settings.COLLISION_COST
+
+            if self.last_state is not None and self.last_action is not None:
+                self.update_q_table(self.last_state, self.last_action, reward, current_state)
+
+            action_to_take = self.choose_action(current_state, dino)
+
+            #realiza a ação escolhida
+            if action_to_take == 1:
+                dino.jump()
+            elif action_to_take == 2:
+                dino.crouch()
+            else:
+                if dino.is_crouching:
+                        dino.stand()
+
+            
+            self.last_state = current_state
+            self.last_action = action_to_take
+            self.total_reward_this_episode += reward
+            
         self.sprites.update()
 
         Obstacle.GLOBAL_SPEED -= settings.SPEED_INCREASE
 
-        spawn_interval = max(300, settings.SPAWN_INTERVAL + Obstacle.GLOBAL_SPEED)
-
-        current_time = pygame.time.get_ticks()
-
-        if current_time - self.last_spawn >= spawn_interval:
+        self.obstacle_spawn_timer += 1
+        
+        # ajuste no intervalo de spawn com base na velocidade
+        spawn_interval = int(max(50, 100 + (Obstacle.GLOBAL_SPEED * 10)))
+        if self.obstacle_spawn_timer >= spawn_interval: 
             self.spawn_obstacle()
-            self.last_spawn = current_time
-            
-        hit_obstacles = pygame.sprite.spritecollide(self.dino, self.obstacles, False, pygame.sprite.collide_rect)
+            self.obstacle_spawn_timer = 0
 
         self.active_dino_count = 0
         for dino in self.dinos:
@@ -136,7 +283,7 @@ class Training:
             self.game_over = True
             return
            
-        self.score += 1/settings.FPS
+        self.score += 1/settings.TRAININGFPS
 
 
     def draw_game(self):
@@ -209,30 +356,128 @@ class Training:
         self.game_over = False
         self.obstacle_spawn_timer = 0
         self.last_spawn = pygame.time.get_ticks()
+        
 
+        #reseta dinossauros
         for dino in self.dinos:
             dino.reset()
 
         self.active_dino_count = self.population_size
 
+        #clear obstacles
         for obstacle in self.obstacles:
             obstacle.kill()
         self.obstacles.empty()
 
+        #reseta global speed pra velocidade inicial dos obstaculos
         Obstacle.GLOBAL_SPEED = settings.OBSTACLE_SPEED
 
     def run(self):
         self.running = True
-        self.reset_game()
-        Obstacle.GLOBAL_SPEED = settings.OBSTACLE_SPEED
+
+        if self.game_over: # Se está começando de um game over
+             self.reset_game()
+
+        if not self.game_over: # Se não está começando de um game over
+                 self.total_reward_this_episode = 0
+                 self.last_state = None
+
         while self.running:     
             self.handle_input()
+            if not self.running: 
+                break
             self.update_game_state() 
             self.draw_game()        
             
-            self.clock.tick(settings.FPS)     
+            self.clock.tick(settings.TRAININGFPS)
+
+        self.save_q_table()     
         
         return self.score 
+    
+    def update_q_table(self, state, action, reward, next_state):
+        current_q_values = self.q_table.get(state, [0.0, 0.0, 0.0])[:]
+        
+        current_q_values = list(current_q_values) + [0.0] * (3 - len(current_q_values))
+        self.q_table[state] = current_q_values
+    
+        old_q_value = current_q_values[action]
+        
+        next_q_values = self.q_table.get(next_state, [0.0, 0.0, 0.0])
+        next_q_values = list(next_q_values) + [0.0] * (3 - len(next_q_values))
+        self.q_table[next_state] = next_q_values
+        
+        # Calcula o maximo futuro q_value
+        max_future_q = np.max(next_q_values)
+        
+        #Atualiza o Q-value usando a formula Q-learning
+        new_q_value = old_q_value + settings.ALPHA * (reward + settings.GAMMA * max_future_q - old_q_value)
+        current_q_values[action] = new_q_value
+        self.q_table[state] = current_q_values
+
+    def save_q_table(self):
+        try:
+            q_table_str_keys = {}
+            for k, v in self.q_table.items():
+                # Converte cada elemento na tuple key pra um int
+                key_as_int = tuple(int(x) for x in k)
+                q_table_str_keys[str(key_as_int)] = v
+                
+            data = {
+                "q_table": q_table_str_keys,
+                "epsilon": float(self.epsilon),
+                "total_episodes_trained": int(self.current_episode)
+            }
+
+            with open(self.q_table_file, 'w') as f:
+                json.dump(data, f)
+            print(f"Q-table salvo em {self.q_table_file}")
+        except Exception as e:
+            print(f"Erro ao salvar a Q-Table: {e}")
+
+    def load_q_table(self):
+        if os.path.exists(self.q_table_file):
+            try:
+                with open(self.q_table_file, 'r') as f:
+                    data = json.load(f)
+                    loaded_q_table_str_keys = data.get("q_table", {})
+                    self.q_table = {}
+                    for k_str, v in loaded_q_table_str_keys.items():
+                        try:
+                            # Handle both regular integers and numpy int64 values
+                            if 'np.int64' in k_str:
+                                # Extract the actual numbers from the string representation
+                                nums = []
+                                for part in k_str.strip('()').split(','):
+                                    if 'np.int64' in part:
+                                        # Extract the number from np.int64(X)
+                                        num_str = part.split('(')[1].split(')')[0]
+                                        nums.append(int(num_str))
+                                    else:
+                                        nums.append(int(part))
+                                state_parts = tuple(nums)
+                            else:
+                                # Regular integer parsing
+                                state_parts = tuple(map(int, k_str.strip('()').split(',')))
+                            self.q_table[state_parts] = v
+                        except ValueError as ve:
+                            print(f"Warning: Could not parse Q-table key: {k_str} ({ve})")
+                        except Exception as e:
+                            print(f"Error parsing Q-table key: {k_str} ({e})")
+                            
+                    self.epsilon = data.get("epsilon", settings.EPSILON_INIT)
+                    self.current_episode = data.get("total_episodes_trained", 0) 
+                    print(f"Q-table carregada")
+            except Exception as e:
+                print(f"Erro ao carregar Q-table: {e}. Criando uma nova.")
+                self.q_table = {}
+                self.epsilon = settings.EPSILON_INIT
+                self.current_episode = 0
+        else:
+            print("Nenhuma Q-table encontrada. Iniciando uma nova")
+            self.q_table = {} 
+            self.epsilon = settings.EPSILON_INIT
+            self.current_episode = 0
     
 
 if __name__ == '__main__':

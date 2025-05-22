@@ -60,13 +60,15 @@ class Game:
 
         Obstacle.GLOBAL_SPEED -= settings.SPEED_INCREASE
 
-        spawn_interval = max(300, settings.SPAWN_INTERVAL + Obstacle.GLOBAL_SPEED)
-
-        current_time = pygame.time.get_ticks()
-
-        if current_time - self.last_spawn >= spawn_interval:
+        self.obstacle_spawn_timer += 1
+        
+        # ajuste no intervalo de spawn com base na velocidade
+        spawn_interval = int(max(50, 100 + (Obstacle.GLOBAL_SPEED * 10)))
+        if self.obstacle_spawn_timer >= spawn_interval: 
             self.spawn_obstacle()
-            self.last_spawn = current_time
+            self.obstacle_spawn_timer = 0
+
+        
             
         hit_obstacles = pygame.sprite.spritecollide(self.dino, self.obstacles, False, pygame.sprite.collide_rect)
         if hit_obstacles:

@@ -9,26 +9,33 @@ class Dino(pygame.sprite.Sprite):
 
         #APARENCIA 
         self.color = settings.DINO_PURPLE.copy()
-        self.color.append(alpha) #adiciona transparencia (100%)
+        self.color.append(alpha) #adiciona transparencia
         self.image = pygame.Surface([width, height], pygame.SRCALPHA)
         self.image.fill(self.color)
         self.height = settings.DINO_HEIGHT
         self.crouch_height = settings.DINO_CROUCH_HEIGHT
         self.width = width
 
-
         #Para população
         self.is_alive = True
         self.id = dino_id
+        self.fitness = 0 #quantos frames ele sobreviveu
+        self.q_table = {} #cada dinossauro tem sua q_table
+        self.last_state = None
+        self.last_action = None
 
-        #POSICAO
+        #totais
+        self.total_crouches = 0
+        self.total_jumps = 0
+
+        #Posição
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
         self.rect.bottom = settings.GROUND_LEVEL #inicia no chao
         self.ground_y = y # Store original y position as ground level
 
-        #MOVIMENTACAO
+        #Movimentação
         self.velocity_y:float = 0
         self.is_jumping:bool = False
         self.on_ground:bool = True
@@ -40,6 +47,7 @@ class Dino(pygame.sprite.Sprite):
         self.raycount = settings.RAYCOUNT
         self.rays = []
         self.init_rays()
+
 
     def init_rays(self):
         self.rays = []
@@ -90,7 +98,10 @@ class Dino(pygame.sprite.Sprite):
                     closest_ground = ray['distance']
                 elif ray['obstacle_type'] == 'flying' and ray['distance'] < closest_flying:
                     closest_flying = ray['distance']
-                    
+        
+        if closest_ground <= 0.0: closest_ground = 0.0
+        if closest_flying <= 0.0: closest_flying = 0.0
+
         return {
             'ground_detected': closest_ground < float('inf'),
             'flying_detected': closest_flying < float('inf'),
@@ -103,26 +114,28 @@ class Dino(pygame.sprite.Sprite):
             self.velocity_y = -settings.JUMP_FORCE
             self.is_jumping = True
             self.on_ground = False
+            self.total_jumps += 1
             return True
         return False
     
     def crouch(self):
         if self.on_ground and not self.is_crouching and not self.is_jumping:
             self.is_crouching = True
-            self.image = pygame.Surface([self.width, self.crouch_height])
+            self.image = pygame.Surface([self.width, self.crouch_height], pygame.SRCALPHA)
             self.image.fill(self.color)
             # ajusta rect para manter a posição
             bottom = self.rect.bottom
             self.rect = self.image.get_rect()
             self.rect.x = self._initial_x
             self.rect.bottom = bottom
+            self.total_crouches += 1
             return True
         return False
 
     def stand(self):
         if self.is_crouching:
             self.is_crouching = False
-            self.image = pygame.Surface([self.width, self.height])
+            self.image = pygame.Surface([self.width, self.height], pygame.SRCALPHA)
             self.image.fill(self.color)
             # ajusta rect para manter a posição
             bottom = self.rect.bottom
@@ -134,18 +147,21 @@ class Dino(pygame.sprite.Sprite):
 
 
     def update(self):
-        if not self.on_ground:
-            self.velocity_y += settings.GRAVITY
-        
-        self.rect.y += int(self.velocity_y) #move o dino com base em sua velocidade em y
+        if self.is_alive:
+            self.fitness += 1
 
-        if self.rect.bottom >= settings.GROUND_LEVEL:
-            self.rect.bottom = settings.GROUND_LEVEL
-            self.velocity_y = 0
-            self.is_jumping = False
-            self.on_ground = True
-        else:
-            self.on_ground = False
+            if not self.on_ground:
+                self.velocity_y += settings.GRAVITY
+            
+            self.rect.y += int(self.velocity_y) #move o dino com base em sua velocidade em y
+
+            if self.rect.bottom >= settings.GROUND_LEVEL:
+                self.rect.bottom = settings.GROUND_LEVEL
+                self.velocity_y = 0
+                self.is_jumping = False
+                self.on_ground = True
+            else:
+                self.on_ground = False
             
     def draw(self, surface:pygame.Surface):
         surface.blit(self.image, self.rect)
@@ -158,10 +174,14 @@ class Dino(pygame.sprite.Sprite):
         self.on_ground = True
         self.is_crouching = False
         self.is_alive = True
+        self.fitness = 0
+        self.last_state = None
+        self.last_state = None
+        self.current_decision_state = None
+        self.current_decision_action = None
 
     def die(self):
         self.is_alive = False
-
 
 #testar colisao e pulo
 if __name__ == '__main__':
