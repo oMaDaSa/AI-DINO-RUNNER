@@ -61,33 +61,41 @@ class Dino(pygame.sprite.Sprite):
             })
         
     def cast_rays(self, obstacles):
-        for i in range (self.raycount):
-            self.rays[i] = {'hit': False, 'distance': settings.RAY_LENGTH, 'obstacle_type': None}
+        self.init_rays()
+
+        origin_x = self.rect.centerx
+        origin_y = self.rect.centery
         
         origin_x = self.rect.centerx
         origin_y = self.rect.centery
 
         for i, angle in enumerate(settings.RAYS):
             angle_rad = math.radians(angle)
-            #calcula o ponto final baseado no tamanho e ponto inicio
+            #o tamanho máximo do ray
             end_x = origin_x + settings.RAY_LENGTH * math.cos(angle_rad)
             end_y = origin_y + settings.RAY_LENGTH * math.sin(angle_rad)
 
-            closest_hit_distance = settings.RAY_LENGTH
-            closest_obstacle = None
+            closest_hit_dist = settings.RAY_LENGTH
+            hit_type = None
 
             for obstacle in obstacles:
-                if obstacle.rect.collidepoint(end_x, end_y) or obstacle.rect.clipline(origin_x, origin_y, end_x, end_y):
-                    obstacle_distance = math.sqrt((obstacle.rect.centerx - origin_x) ** 2 + (obstacle.rect.centery - origin_y) ** 2)
-                    
-                    if obstacle_distance < closest_hit_distance:
-                        closest_hit_distance = obstacle_distance
-                        closest_obstacle = obstacle
+                clipped_segment_points = obstacle.rect.clipline(
+                    (origin_x, origin_y),
+                    (end_x, end_y)
+                )
+                if clipped_segment_points:
+                    intersect_x, intersect_y = clipped_segment_points[0]
+                    # Calcula a distancia entre a origem do raio e esse ponto de intersecção
+                    dist_to_intersection = math.hypot(intersect_x - origin_x, intersect_y - origin_y)
+
+                    if dist_to_intersection < closest_hit_dist:
+                        closest_hit_dist = dist_to_intersection
+                        hit_type = 'flying' if obstacle.is_flying else 'ground'
                 
-            if closest_obstacle is not None:
+            if hit_type is not None: # Se um obstaculo foi atingido
                 self.rays[i]['hit'] = True
-                self.rays[i]['distance'] = closest_hit_distance
-                self.rays[i]['obstacle_type'] = 'flying' if closest_obstacle.is_flying else 'ground'
+                self.rays[i]['distance'] = closest_hit_dist
+                self.rays[i]['obstacle_type'] = hit_type
                 
         closest_ground = float('inf')
         closest_flying = float('inf')
