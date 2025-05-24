@@ -59,8 +59,6 @@ class Training:
         self.epsilon = settings.EPSILON_INIT
         self.current_episode = 0
         self.episodes_this_session = 0
-        self.last_state = None
-        self.last_action = None
         self.total_rewards = 0
         self.q_table_file = "dino_q_table.json"
         self.load_q_table()
@@ -193,98 +191,116 @@ class Training:
 
 
     def update_game_state(self):
-        if self.active_dino_count == 0 or self.game_over:
-            self.select_best_dinosaur()
-            reward = -100.0
-            self.total_reward_this_episode += reward #penalidade por gameover
 
-            if self.last_state is not None:
-                current_q_values = self.q_table.get(self.last_state, [0.0, 0.0,][:])
-                old_q_value = current_q_values[self.last_action]
-                new_q_value = old_q_value + settings.ALPHA * (reward - old_q_value)
-                current_q_values[self.last_action] = new_q_value
-                self.q_table[self.last_state] = current_q_values
-            
-            #inicia uma nova geração
+        if self.game_over:
+            self.select_best_dinosaur()
             self.reset_game()
+
             self.generation += 1
             self.current_episode += 1
             self.episodes_this_session += 1
             self.epsilon = max(settings.EPSILON_MIN, self.epsilon * settings.EPSILON_DECAY)
-            self.last_state = None
-            self.last_action = None
-            self.total_reward_this_episode = 0
 
             if self.episodes_this_session > 0 and self.episodes_this_session % 50 == 0:
                 self.save_q_table()
-            return 
-        
+            return # Encerra esse game. A próxima chamada vai criar a nova geração
+
+        #etapa 1: cada dinossauro vivo observa o estado do jogo
         for dino in self.dinos:
-            if not dino.is_alive:
+            if not dino.is_alive: #os mortos não fazem nada
+                cur_decision = None
+                cur_action = None
                 continue
-            
+
             dino.cast_rays(self.obstacles)
-            current_state = self.get_state(dino)
+            observed_state_s = self.get_state(dino) #estado s pra decisão
 
-            obstacle_info = self.detect_obstacles(dino)
+            action_to_take = self.choose_action(observed_state_s, dino) #escolhe ação pro estado
 
-            #escalar as recompensas com a velocidade do jogo
-            speed_factor = min(1.0, abs(Obstacle.GLOBAL_SPEED) / 10)
-            reward = 0.05 + (0.05 * speed_factor)
+            cur_decision = observed_state_s
+            cur_action = action_to_take
 
-            #possivel aplicar recompensas mais extremas em casos como: pulou um obstaculo necessario
-
-            if obstacle_info['ground_distance'] == 0.0 or obstacle_info['flying_distance'] == 0.0:
-                reward -= settings.COLLISION_COST
-
-            if self.last_state is not None and self.last_action is not None:
-                self.update_q_table(self.last_state, self.last_action, reward, current_state)
-
-            action_to_take = self.choose_action(current_state, dino)
-
-            #realiza a ação escolhida
+            # faz ação
             if action_to_take == 1:
                 dino.jump()
             elif action_to_take == 2:
                 dino.crouch()
             else:
                 if dino.is_crouching:
-                        dino.stand()
-
+                    dino.stand()
             
-            self.last_state = current_state
-            self.last_action = action_to_take
-            self.total_reward_this_episode += reward
-            
-        self.sprites.update()
-
-        Obstacle.GLOBAL_SPEED -= settings.SPEED_INCREASE
-
-        self.obstacle_spawn_timer += 1
+            #etapa 2: atualiza o mundo
+        self.sprites.update() 
         
-        # ajuste no intervalo de spawn com base na velocidade
-        spawn_interval = int(max(50, 100 + (Obstacle.GLOBAL_SPEED * 10)))
-        if self.obstacle_spawn_timer >= spawn_interval: 
+        Obstacle.GLOBAL_SPEED -= settings.SPEED_INCREASE #fica mais rapido
+        self.score += 1 #/ settings.TRAININGFPS #incrementa score
+
+        # spawn de obstaculos
+        self.obstacle_spawn_timer += 1
+        spawn_interval = int(max(50, 100 + (Obstacle.GLOBAL_SPEED * 10))) # ajuste baseado na velocidade
+        if self.obstacle_spawn_timer >= spawn_interval:
             self.spawn_obstacle()
             self.obstacle_spawn_timer = 0
 
-        self.active_dino_count = 0
+        #fase 3: pra cada dinossauro, observar os resultado e aprender com os passos anteriores
+        new_active_dino_count = 0
         for dino in self.dinos:
             if not dino.is_alive:
                 continue
+            
+            #stado s' é o estado apos o sprite update
+            dino.cast_rays(self.obstacles)
+            state_s_prime = self.get_state(dino)
 
-            self.active_dino_count += 1
-            hit_obstacles = pygame.sprite.spritecollide(dino, self.obstacles, False, pygame.sprite.collide_rect)
-            if hit_obstacles:
+            speed_factor = min(1.0, abs(Obstacle.GLOBAL_SPEED) / 10)
+            reward = 0.05 + (0.05 * speed_factor)
+
+
+            #verifica colisao e aplcia custos
+            collided_this_step = False
+            hit_obstacles_sprites = pygame.sprite.spritecollide(dino, self.obstacles, False, pygame.sprite.collide_rect)
+
+            #se colidiu
+            if hit_obstacles_sprites:
+                reward_r = -settings.COLLISION_COST
+                collided_this_step = True
+            
+            #se nao colidiu
+            if not collided_this_step:
+                if dino.last_action == 1:
+                    reward -= settings.JUMP_COST
+                elif dino.last_action == 2: 
+                    reward -= settings.CROUCH_COST
+
+            # Atualiza o q-learning com (dino.lst_state, dino.last_action) como (s, a)
+            # state_s_prime é s', e reward é r.
+            if dino.last_state is not None and dino.last_action is not None:
+                if collided_this_step: # se colidiu (state_s_prime é terminal)
+                    # terminal update: Q(s,a) = Q(s,a) + alpha * (r - Q(s,a))
+                    # porque o max_future_q pra um estado terminal é 0
+                    current_q_values = self.q_table.get(dino.last_state, [0.0, 0.0, 0.0])[:]
+                    old_q_value = current_q_values[dino.last_action]
+                    new_q_value = old_q_value + settings.ALPHA * (reward_r - old_q_value)
+                    current_q_values[dino.last_action] = new_q_value
+                    self.q_table[dino.last_state] = current_q_values
+                    
+                else: # state_s_prime não é terminal
+                    self.update_q_table(dino.last_state, dino.last_action, reward, state_s_prime)
+
+            # Atualiza histórico do dinossauro
+            if collided_this_step:
                 dino.die()
-                self.active_dino_count -= 1
+                dino.last_state = None
+                dino.last_action = None
+            else:
 
+                dino.last_state = cur_decision
+                dino.last_action = cur_action
+                new_active_dino_count += 1
+        
+        self.active_dino_count = new_active_dino_count
         if self.active_dino_count == 0:
             self.game_over = True
-            return
-           
-        self.score += 1/settings.TRAININGFPS
-
 
     def draw_game(self):
         self.screen.fill(settings.SKY_BLUE)
@@ -377,10 +393,6 @@ class Training:
 
         if self.game_over: # Se está começando de um game over
              self.reset_game()
-
-        if not self.game_over: # Se não está começando de um game over
-                 self.total_reward_this_episode = 0
-                 self.last_state = None
 
         while self.running:     
             self.handle_input()

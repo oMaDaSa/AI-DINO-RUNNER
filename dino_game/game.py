@@ -74,7 +74,7 @@ class Game:
         if hit_obstacles:
             self.game_over = True 
            
-        self.score += 1/settings.FPS
+        self.score += 1
 
 
     def draw_game(self):

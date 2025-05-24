@@ -184,9 +184,7 @@ class Dino(pygame.sprite.Sprite):
         self.is_alive = True
         self.fitness = 0
         self.last_state = None
-        self.last_state = None
-        self.current_decision_state = None
-        self.current_decision_action = None
+        self.last_action = None
 
     def die(self):
         self.is_alive = False
