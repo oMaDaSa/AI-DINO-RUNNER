@@ -19,11 +19,11 @@ class Obstacle(pygame.sprite.Sprite):
 
         #APARENCIA 
         self.image = pygame.Surface([self.width, self.height])
-        self.image.fill(settings.OBSTACLE_GREEN)
+        self.image.fill(settings.COLOR_GROUND_OBSTACLE)
         if is_flying:
-            self.image.fill(settings.OBSTACLE_ORANGE)
+            self.image.fill(settings.COLOR_FLYING_OBSTACLE)
         else:
-            self.image.fill(settings.OBSTACLE_GREEN)
+            self.image.fill(settings.COLOR_GROUND_OBSTACLE)
 
         #POSICAO
         self.rect = self.image.get_rect()
@@ -87,10 +87,10 @@ if __name__ == '__main__':
 
         obstacles.update()
         #desenha ceu
-        screen.fill(settings.SKY_BLUE)
+        screen.fill(settings.COLOR_SKY)
 
         #desenha chao
-        pygame.draw.rect(screen, settings.GROUND_BROWN, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
+        pygame.draw.rect(screen, settings.COLOR_GROUND, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
 
         #desenha todos os obstaculos
         for sprite in obstacles:

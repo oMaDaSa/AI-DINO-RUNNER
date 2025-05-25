@@ -80,13 +80,13 @@ class Game:
 
 
     def draw_game(self):
-        self.screen.fill(settings.SKY_BLUE)
-        pygame.draw.rect(self.screen, settings.GROUND_BROWN, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
+        self.screen.fill(settings.COLOR_SKY)
+        pygame.draw.rect(self.screen, settings.COLOR_GROUND, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
        
         for entity in self.sprites:
             entity.draw(self.screen)
 
-        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.TEXT_COLOR)
+        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
         self.screen.blit(score_text, (10, 10))
 
 

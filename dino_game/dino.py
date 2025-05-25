@@ -8,7 +8,7 @@ class Dino(pygame.sprite.Sprite):
         super().__init__()
 
         #APARENCIA 
-        self.color = settings.DINO_PURPLE.copy()
+        self.color = settings.COLOR_DINO.copy()
         self.color.append(alpha) #adiciona transparencia
         self.image = pygame.Surface([width, height], pygame.SRCALPHA)
         self.image.fill(self.color)
@@ -232,8 +232,8 @@ if __name__ == '__main__':
         
         dino.update() # O update agora pode fazer o dino levantar se o pedido estiver pendente e o cooldown expirou
 
-        screen.fill(settings.SKY_BLUE) 
-        pygame.draw.rect(screen, settings.GROUND_BROWN, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
+        screen.fill(settings.COLOR_SKY) 
+        pygame.draw.rect(screen, settings.COLOR_GROUND, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
         dino.draw(screen)
         pygame.display.flip()
         clock.tick(settings.FPS)

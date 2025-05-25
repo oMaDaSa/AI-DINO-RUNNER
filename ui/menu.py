@@ -18,7 +18,7 @@ class Button:
         current_color = self.hover_color if self.is_hovered else self.color
         pygame.draw.rect(surface, current_color, self.rect, border_radius = 10)
 
-        text_surface = self.font.render(self.text, True, settings.TEXT_COLOR)
+        text_surface = self.font.render(self.text, True, settings.COLOR_TEXT)
         text_rect = text_surface.get_rect(center=self.rect.center)
         surface.blit(text_surface, text_rect)
 
@@ -48,15 +48,15 @@ class MainMenu:
         start_y = settings.SCREEN_HEIGHT // 2 - (3 * btn_height + 2 * btn_spacing) // 2
 
         self.buttons = [
-            Button("Play", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 0 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("play")),
+            Button("Play", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 0 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("play")),
 
-            Button("Train Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 1 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("train")),
+            Button("Train Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 1 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("train")),
 
-            Button("Watch Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("watch")),
+            Button("Watch Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("watch")),
 
-            Button("Versus Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 3 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("versus")),
+            Button("Versus Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 3 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("versus")),
 
-            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 4 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
+            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 4 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
         ]
 
     def select_option(self, option_key: str):
@@ -66,7 +66,7 @@ class MainMenu:
 
     def draw_main_menu(self):
         #titulo
-        title_text = self.font_large.render("Game", True, settings.TEXT_COLOR)
+        title_text = self.font_large.render("Game", True, settings.COLOR_TEXT)
         title_rect = title_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 4))
         self.screen.blit(title_text, title_rect)
 
@@ -88,7 +88,7 @@ class MainMenu:
                     for button in self.buttons:
                         button.handle_event(event)
 
-            self.screen.fill(settings.SKY_BLUE)
+            self.screen.fill(settings.COLOR_SKY)
             self.draw_main_menu()
             
             pygame.display.flip()

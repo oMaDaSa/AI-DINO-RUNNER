@@ -305,8 +305,8 @@ class Train:
             self.game_over = True
 
     def draw_game(self):
-        self.screen.fill(settings.SKY_BLUE)
-        pygame.draw.rect(self.screen, settings.GROUND_BROWN, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
+        self.screen.fill(settings.COLOR_SKY)
+        pygame.draw.rect(self.screen, settings.COLOR_GROUND, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
         
         for entity in self.sprites:
             if isinstance(entity, Dino):
@@ -346,7 +346,7 @@ class Train:
                     
                     pygame.draw.line(self.screen, ray_color, ray_start, ray_end, 2)
 
-        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.TEXT_COLOR)
+        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
         self.screen.blit(score_text, (10, 10))
 
 
