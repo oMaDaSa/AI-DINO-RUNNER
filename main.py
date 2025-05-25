@@ -23,7 +23,7 @@ class App:
         if gamemode == "play":
             self.current_game_instance = game.Game(self.screen)
         elif gamemode == "train":
-            self.current_game_instance = train_ai.Training(self.screen)
+            self.current_game_instance = train_ai.Train(self.screen)
         score = self.current_game_instance.run()
         self.current_game_instance = None
 
@@ -36,7 +36,7 @@ class App:
 
             if selected_action_key == "quit":
                 self.quit_game()
-            elif selected_action_key == "play" or selected_action_key == "train":
+            elif selected_action_key in ["play", "train", "watch", "versus"] :
                 self.play(gamemode = selected_action_key)
             else:
                 pass 

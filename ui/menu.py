@@ -52,7 +52,11 @@ class MainMenu:
 
             Button("Train Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 1 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("train")),
 
-            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
+            Button("Watch Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("watch")),
+
+            Button("Versus Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 3 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("versus")),
+
+            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 4 * (btn_height + btn_spacing), btn_width, btn_height, settings.BUTTON_GRAY, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
         ]
 
     def select_option(self, option_key: str):

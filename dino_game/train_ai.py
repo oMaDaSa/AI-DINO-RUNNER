@@ -8,7 +8,7 @@ import numpy as np
 import os
 import json
 
-class Training:
+class Train:
     def __init__(self, screen: pygame.Surface):
         self.screen = screen
         self.clock = pygame.time.Clock()
@@ -26,13 +26,12 @@ class Training:
         self.active_dino_count = 0
         self.best_dino = None
         self.best_fitness = 0
-        self.generation = 1
 
         #Q-values visualização
         self.q_val_no_action = 0.0
         self.q_val_jump = 0.0
-        self.q_val_crouch = 0.0    
-
+        self.q_val_crouch = 0.0
+        self.q_val_stand = 0.0
 
         #Detecção de obstáculos visualização
         self.obstacle_detection = {
@@ -59,7 +58,6 @@ class Training:
         self.epsilon = settings.EPSILON_INIT
         self.current_episode = 0
         self.episodes_this_session = 0
-        self.total_rewards = 0
         self.q_table_file = "dino_q_table.json"
         self.load_q_table()
         self.distance_bin_edges = np.linspace(0, settings.RAY_LENGTH, settings.DISTANCE_BINS + 1)
@@ -79,7 +77,6 @@ class Training:
             state_components.append(distance_bin)
 
             # (0: nenhum obstaculo, 1: obstaculo terreste, 2: obstaculo voador)
-            # Obstacle type component (0: no obstacle, 1: ground obstacle, 2: flying obstacle)
             if not ray['hit']:
                 obstacle_type_value = 0
             elif ray['obstacle_type'] == 'ground':
@@ -133,23 +130,20 @@ class Training:
         self.obstacle_detection = obstacle_info 
 
         #pega os q_value pra esse estado
-        #0 = nada/ 1 = pulo/ 2 = agachar
-        q_values = self.q_table.get(state_tuple, [0.0, 0.0, 0.0])
+        #0 = nada/ 1 = pulo/ 2 = agachar/ 3 = levantar
+        default_q_list = [0.0, 0.0, 0.0, 0.0]
+        q_values = list(self.q_table.get(state_tuple, default_q_list))
 
-        # armazena para visualização
+
         self.q_val_no_action = q_values[0]
         self.q_val_jump = q_values[1]
         self.q_val_crouch = q_values[2]
+        self.q_val_stand = q_values[3]  
 
         #exploração
         if random.uniform(0, 1) < self.epsilon:
-            rand_val = random.random()
-            if rand_val < settings.EXPLORATION_JUMP_PROB:
-                return 1
-            elif rand_val < settings.EXPLORATION_JUMP_PROB + 0.05:
-                return 2
-            else:
-                return 0
+            rand_val = random.choice([0,1,2,3])
+            return rand_val
 
         # É possivel guiar o aprendizado, dando sugestões para uma fase inicial de treinamento (epsilon acima de um determinado valor)
         # Não forçar a escolha, mas sugerir ela
@@ -187,7 +181,7 @@ class Training:
             if best_dino.q_table:
                 self.q_table = best_dino.q_table.copy()
 
-            print(f"Geração {self.generation}: Melhor dinossauro: {best_dino.id} com fitness {best_fitness}")
+            print(f"Episódio {self.current_episode}: Melhor dinossauro: {best_dino.id} com fitness {best_fitness}")
 
 
     def update_game_state(self):
@@ -196,7 +190,6 @@ class Training:
             self.select_best_dinosaur()
             self.reset_game()
 
-            self.generation += 1
             self.current_episode += 1
             self.episodes_this_session += 1
             self.epsilon = max(settings.EPSILON_MIN, self.epsilon * settings.EPSILON_DECAY)
@@ -208,8 +201,6 @@ class Training:
         #etapa 1: cada dinossauro vivo observa o estado do jogo
         for dino in self.dinos:
             if not dino.is_alive: #os mortos não fazem nada
-                cur_decision = None
-                cur_action = None
                 continue
 
             dino.cast_rays(self.obstacles)
@@ -217,19 +208,19 @@ class Training:
 
             action_to_take = self.choose_action(observed_state_s, dino) #escolhe ação pro estado
 
-            cur_decision = observed_state_s
-            cur_action = action_to_take
+            cur_decision = observed_state_s # Usado para dino.last_state
+            cur_action = action_to_take   # Usado para dino.last_action
 
             # faz ação
-            if action_to_take == 1:
+            if action_to_take == 1: # Pular
                 dino.jump()
-            elif action_to_take == 2:
+            elif action_to_take == 2: # Agachar 
                 dino.crouch()
-            else:
-                if dino.is_crouching:
+            elif action_to_take == 3: # Levantar (nova ação)
+                if dino.is_crouching: # Só levanta se estiver agachado
                     dino.stand()
             
-            #etapa 2: atualiza o mundo
+        #etapa 2: atualiza o mundo
         self.sprites.update() 
         
         Obstacle.GLOBAL_SPEED -= settings.SPEED_INCREASE #fica mais rapido
@@ -237,13 +228,16 @@ class Training:
 
         # spawn de obstaculos
         self.obstacle_spawn_timer += 1
-        spawn_interval = int(max(50, 100 + (Obstacle.GLOBAL_SPEED * 10))) # ajuste baseado na velocidade
+        calculated_interval = settings.SPAWN_INTERVAL + (Obstacle.GLOBAL_SPEED * settings.SPAWN_INTERVAL_SPEED_EFFECT)
+        spawn_interval = int(calculated_interval)
+        
         if self.obstacle_spawn_timer >= spawn_interval:
             self.spawn_obstacle()
             self.obstacle_spawn_timer = 0
 
         #fase 3: pra cada dinossauro, observar os resultado e aprender com os passos anteriores
         new_active_dino_count = 0
+        default_q_list_terminal = [0.0, 0.0, 0.0, 0.0] # Para uso no update terminal
         for dino in self.dinos:
             if not dino.is_alive:
                 continue
@@ -253,7 +247,8 @@ class Training:
             state_s_prime = self.get_state(dino)
 
             speed_factor = min(1.0, abs(Obstacle.GLOBAL_SPEED) / 10)
-            reward = 0.05 + (0.05 * speed_factor)
+            # reward = 0.05 + (0.05 * speed_factor) # Recompensa base por sobreviver
+            current_reward = 0.05 + (0.05 * speed_factor) # Renomeado para evitar confusão com 'reward_r'
 
 
             #verifica colisao e aplcia custos
@@ -262,30 +257,38 @@ class Training:
 
             #se colidiu
             if hit_obstacles_sprites:
-                reward_r = -settings.COLLISION_COST
+                actual_reward_for_update = -settings.COLLISION_COST # Recompensa negativa por colisão
                 collided_this_step = True
-            
-            #se nao colidiu
-            if not collided_this_step:
-                if dino.last_action == 1:
-                    reward -= settings.JUMP_COST
-                elif dino.last_action == 2: 
-                    reward -= settings.CROUCH_COST
+            else: #se nao colidiu
+                actual_reward_for_update = current_reward # Usa a recompensa base por sobreviver
+                if dino.last_action == 1: # Custo do Pulo
+                    actual_reward_for_update -= settings.JUMP_COST
+                elif dino.last_action == 2: # Custo de Agachar (Ação 2)
+                    actual_reward_for_update -= settings.CROUCH_COST
+                # Nenhum custo específico para Ação 0 (Manter) ou Ação 3 (Levantar) aqui.
 
-            # Atualiza o q-learning com (dino.lst_state, dino.last_action) como (s, a)
-            # state_s_prime é s', e reward é r.
+            # Atualiza o q-learning com (dino.last_state, dino.last_action) como (s, a)
+            # state_s_prime é s', e actual_reward_for_update é r.
             if dino.last_state is not None and dino.last_action is not None:
                 if collided_this_step: # se colidiu (state_s_prime é terminal)
                     # terminal update: Q(s,a) = Q(s,a) + alpha * (r - Q(s,a))
                     # porque o max_future_q pra um estado terminal é 0
-                    current_q_values = self.q_table.get(dino.last_state, [0.0, 0.0, 0.0])[:]
-                    old_q_value = current_q_values[dino.last_action]
-                    new_q_value = old_q_value + settings.ALPHA * (reward_r - old_q_value)
-                    current_q_values[dino.last_action] = new_q_value
-                    self.q_table[dino.last_state] = current_q_values
+                    
+                    current_q_values_list = list(self.q_table.get(dino.last_state, default_q_list_terminal))
+                    if len(current_q_values_list) < 4: # Garante 4 elementos
+                        current_q_values_list.extend([0.0] * (4 - len(current_q_values_list)))
+                    current_q_values = current_q_values_list[:] # Cópia mutável
+
+                    if 0 <= dino.last_action < len(current_q_values): # Checagem de segurança
+                        old_q_value = current_q_values[dino.last_action]
+                        new_q_value = old_q_value + settings.ALPHA * (actual_reward_for_update - old_q_value)
+                        current_q_values[dino.last_action] = new_q_value
+                        self.q_table[dino.last_state] = current_q_values
+                    else:
+                        print(f"AVISO: dino.last_action ({dino.last_action}) fora do range para Q-values no estado terminal.")
                     
                 else: # state_s_prime não é terminal
-                    self.update_q_table(dino.last_state, dino.last_action, reward, state_s_prime)
+                    self.update_q_table(dino.last_state, dino.last_action, actual_reward_for_update, state_s_prime)
 
             # Atualiza histórico do dinossauro
             if collided_this_step:
@@ -293,7 +296,6 @@ class Training:
                 dino.last_state = None
                 dino.last_action = None
             else:
-
                 dino.last_state = cur_decision
                 dino.last_action = cur_action
                 new_active_dino_count += 1
@@ -305,7 +307,7 @@ class Training:
     def draw_game(self):
         self.screen.fill(settings.SKY_BLUE)
         pygame.draw.rect(self.screen, settings.GROUND_BROWN, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
-       
+        
         for entity in self.sprites:
             if isinstance(entity, Dino):
                 if entity.is_alive:  # só os dinossauros vivos
@@ -348,31 +350,11 @@ class Training:
         self.screen.blit(score_text, (10, 10))
 
 
-        if self.game_over:
-            overlay = pygame.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 128)) # 50% opacidade
-            self.screen.blit(overlay, (0,0))
-
-            game_over_text = self.font.render("Game Over", True, (255,255,255)) 
-            text_rect = game_over_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 - 30))
-            self.screen.blit(game_over_text, text_rect)
-            
-            final_score_text = self.small_font.render(f"Final Score: {self.score}", True, (255,255,255))
-            score_rect = final_score_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 10))
-            self.screen.blit(final_score_text, score_rect)
-
-            restart_text = self.small_font.render("'R' - Restart | ESC - Menu", True, (200,200,200))
-            restart_rect = restart_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 50))
-            self.screen.blit(restart_text, restart_rect)
-
-        pygame.display.flip()
-
     def reset_game(self):
         self.score = 0
         self.game_over = False
         self.obstacle_spawn_timer = 0
         self.last_spawn = pygame.time.get_ticks()
-        
 
         #reseta dinossauros
         for dino in self.dinos:
@@ -385,7 +367,6 @@ class Training:
             obstacle.kill()
         self.obstacles.empty()
 
-        #reseta global speed pra velocidade inicial dos obstaculos
         Obstacle.GLOBAL_SPEED = settings.OBSTACLE_SPEED
 
     def run(self):
@@ -400,7 +381,7 @@ class Training:
                 break
             self.update_game_state() 
             self.draw_game()        
-            
+            pygame.display.flip()
             self.clock.tick(settings.TRAININGFPS)
 
         self.save_q_table()     
@@ -408,16 +389,18 @@ class Training:
         return self.score 
     
     def update_q_table(self, state, action, reward, next_state):
-        current_q_values = self.q_table.get(state, [0.0, 0.0, 0.0])[:]
-        
-        current_q_values = list(current_q_values) + [0.0] * (3 - len(current_q_values))
+        default_q_list = [0.0, 0.0, 0.0, 0.0]
+
+        current_q_values_from_table = self.q_table.get(state, default_q_list)
+        current_q_values = list(current_q_values_from_table) # Cria cópia para modificação
+
         self.q_table[state] = current_q_values
-    
+
         old_q_value = current_q_values[action]
         
-        next_q_values = self.q_table.get(next_state, [0.0, 0.0, 0.0])
-        next_q_values = list(next_q_values) + [0.0] * (3 - len(next_q_values))
-        self.q_table[next_state] = next_q_values
+        next_q_values_from_table = self.q_table.get(next_state, default_q_list)
+        next_q_values = list(next_q_values_from_table) # Cria cópia
+        self.q_table[next_state] = next_q_values 
         
         # Calcula o maximo futuro q_value
         max_future_q = np.max(next_q_values)
@@ -425,7 +408,7 @@ class Training:
         #Atualiza o Q-value usando a formula Q-learning
         new_q_value = old_q_value + settings.ALPHA * (reward + settings.GAMMA * max_future_q - old_q_value)
         current_q_values[action] = new_q_value
-        self.q_table[state] = current_q_values
+        self.q_table[state] = current_q_values 
 
     def save_q_table(self):
         try:
@@ -433,7 +416,7 @@ class Training:
             for k, v in self.q_table.items():
                 # Converte cada elemento na tuple key pra um int
                 key_as_int = tuple(int(x) for x in k)
-                q_table_str_keys[str(key_as_int)] = v
+                q_table_str_keys[str(key_as_int)] = v # v será uma lista de 4 floats
                 
             data = {
                 "q_table": q_table_str_keys,
@@ -442,7 +425,7 @@ class Training:
             }
 
             with open(self.q_table_file, 'w') as f:
-                json.dump(data, f)
+                json.dump(data, f, indent=4) #indent para melhor leitura do JSON
             print(f"Q-table salvo em {self.q_table_file}")
         except Exception as e:
             print(f"Erro ao salvar a Q-Table: {e}")
@@ -454,32 +437,35 @@ class Training:
                     data = json.load(f)
                     loaded_q_table_str_keys = data.get("q_table", {})
                     self.q_table = {}
-                    for k_str, v in loaded_q_table_str_keys.items():
+                    for k_str, v_list in loaded_q_table_str_keys.items():
+                        # v_list são os Q-values (lista de floats)
                         try:
-                            # Handle both regular integers and numpy int64 values
+                            # Processamento da chave k_str
                             if 'np.int64' in k_str:
-                                # Extract the actual numbers from the string representation
+                                # numpy int
                                 nums = []
                                 for part in k_str.strip('()').split(','):
+                                    part = part.strip()
                                     if 'np.int64' in part:
-                                        # Extract the number from np.int64(X)
                                         num_str = part.split('(')[1].split(')')[0]
                                         nums.append(int(num_str))
                                     else:
                                         nums.append(int(part))
                                 state_parts = tuple(nums)
                             else:
-                                # Regular integer parsing
+                                # python Int
                                 state_parts = tuple(map(int, k_str.strip('()').split(',')))
-                            self.q_table[state_parts] = v
-                        except ValueError as ve:
-                            print(f"Warning: Could not parse Q-table key: {k_str} ({ve})")
-                        except Exception as e:
-                            print(f"Error parsing Q-table key: {k_str} ({e})")
                             
-                    self.epsilon = data.get("epsilon", settings.EPSILON_INIT)
-                    self.current_episode = data.get("total_episodes_trained", 0) 
-                    print(f"Q-table carregada")
+                            final_v_list = list(v_list)
+
+                            self.q_table[state_parts] = final_v_list
+
+                        except Exception as e:
+                            print(f"Erro em Q-table key: {k_str} ou valor: {v_list} ({e})")
+                                
+                self.epsilon = data.get("epsilon", settings.EPSILON_INIT)
+                self.current_episode = data.get("total_episodes_trained", 0) 
+                print(f"Q-table carregada.")
             except Exception as e:
                 print(f"Erro ao carregar Q-table: {e}. Criando uma nova.")
                 self.q_table = {}
@@ -497,7 +483,7 @@ if __name__ == '__main__':
     
     test_screen = pygame.display.set_mode((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
 
-    game_instance = Training(screen=test_screen)
+    game_instance = Train(screen=test_screen)
     
     game_instance.run()
 

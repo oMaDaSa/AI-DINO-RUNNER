@@ -29,7 +29,7 @@ class Obstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = settings.SCREEN_WIDTH + random.randint(50, 200) # Spawn fora da tela, com uma variação
         if is_flying:
-            self.altitude = random.randint(settings.FLYING_OBSTACLE_ALTITUDE_MIN, settings.FLYING_OBSTACLE_ALTITUDE_MAX)
+            self.altitude = random.choice(settings.FLYING_OBSTACLE_ALTITUDE)
         else:
             self.altitude = 0
 

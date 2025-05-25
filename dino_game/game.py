@@ -10,7 +10,6 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
-        self.last_spawn = pygame.time.get_ticks()
 
         self.running = False
         self.game_over = False
@@ -62,9 +61,12 @@ class Game:
 
         self.obstacle_spawn_timer += 1
         
-        # ajuste no intervalo de spawn com base na velocidade
-        spawn_interval = int(max(50, 100 + (Obstacle.GLOBAL_SPEED * 10)))
-        if self.obstacle_spawn_timer >= spawn_interval: 
+        # spawn de obstaculos
+        self.obstacle_spawn_timer += 1
+        calculated_interval = settings.SPAWN_INTERVAL + (Obstacle.GLOBAL_SPEED * settings.SPAWN_INTERVAL_SPEED_EFFECT)
+        spawn_interval = int(calculated_interval)
+        
+        if self.obstacle_spawn_timer >= spawn_interval:
             self.spawn_obstacle()
             self.obstacle_spawn_timer = 0
 
@@ -105,27 +107,29 @@ class Game:
             restart_rect = restart_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 50))
             self.screen.blit(restart_text, restart_rect)
 
-        pygame.display.flip()
+        
 
     def reset_game(self):
         self.score = 0
         self.game_over = False
         self.obstacle_spawn_timer = 0
-        self.last_spawn = pygame.time.get_ticks()
 
         self.dino.reset()
         for obstacle in self.obstacles:
             obstacle.kill()
 
+        Obstacle.GLOBAL_SPEED = settings.OBSTACLE_SPEED
+
     def run(self):
         self.running = True
-        self.reset_game()
-        Obstacle.GLOBAL_SPEED = settings.OBSTACLE_SPEED
+        self.reset_game() 
+        
         while self.running:
             self.handle_input()     
             self.update_game_state() 
             self.draw_game()        
-            
+            pygame.display.flip()
+
             self.clock.tick(settings.FPS)     
         
         return self.score 
