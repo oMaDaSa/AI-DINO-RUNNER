@@ -86,8 +86,6 @@ class BaseGame:
         
     def check_collisions(self, dino):
         hit_obstacles = pygame.sprite.spritecollide(dino, self.obstacles, False, pygame.sprite.collide_rect)
-        if hit_obstacles:
-            self.game_over = True
         return hit_obstacles
 
     def reset_game(self):
@@ -162,6 +160,8 @@ class BaseAIGame(BaseGame):
     def perform_action(self, dino, action):
         # executa a ação escolhida
         if action == 1: 
+            if dino.is_crouching: 
+                dino.stand()
             dino.jump()
         elif action == 2:
             dino.crouch()

@@ -29,7 +29,8 @@ class Watch(BaseAIGame):
         super().update_game_state()
 
         # passo 5: checa colisoes
-        self.check_collisions(self.dino)
+        if self.check_collisions(self.dino):
+            self.game_over = True
 
 
     def reset_game(self):

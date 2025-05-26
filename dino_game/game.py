@@ -39,7 +39,8 @@ class Game(BaseGame):
             return 
 
         super().update_game_state()
-        self.check_collisions(self.dino)
+        if self.check_collisions(self.dino):
+            self.game_over = True
         self.score += 1
 
 

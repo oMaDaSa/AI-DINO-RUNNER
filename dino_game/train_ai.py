@@ -217,6 +217,99 @@ class Train(BaseAIGame):
         self.active_dino_count = new_active_dino_count
         if self.active_dino_count == 0:
             self.game_over = True
+    
+    def draw_info(self):
+        #score
+        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
+        self.screen.blit(score_text, (10, 10))
+        
+        small_font = pygame.font.Font(None, 20)
+
+        #painel no lado direito
+        info_panel = pygame.Rect(settings.SCREEN_WIDTH - 200, 10, 190, 380)
+        info_surface = pygame.Surface((info_panel.width, info_panel.height), pygame.SRCALPHA) #superficie, draw rect nao suporta trasparência
+        info_surface.fill((0, 0, 0, 180))  # preto com transparencia
+        self.screen.blit(info_surface, info_panel)
+        pygame.draw.rect(self.screen, (200, 200, 200), info_panel, 1) #borda
+
+        y_pos = info_panel.y + 10
+        line_height = 20
+
+        #titulo
+        title_text = small_font.render("Training info", True, settings.COLOR_TEXT)
+        self.screen.blit(title_text, (info_panel.x + 5, y_pos))
+        y_pos += line_height + 5
+
+        stats = [
+            f"Episode: {self.current_episode}",
+            f"Population: {self.active_dino_count}/{self.population_size}",
+            f"Epsilon: {self.epsilon:.3f}", 
+            f"Best Fitness: {self.best_fitness:.1f}"  
+        ]
+
+        for stat in stats:
+            stat_text = small_font.render(stat, True, settings.COLOR_TEXT)
+            self.screen.blit(stat_text, (info_panel.x + 5, y_pos))
+            y_pos += line_height
+        
+
+        #Seção dos q-values (primeiro dino apenas)
+        y_pos += 5 #pequeno espaçamento adicional
+        q_title = small_font.render("Q-values: ", True,settings.COLOR_TEXT)
+        self.screen.blit(q_title, (info_panel.x + 5, y_pos))
+        y_pos += line_height
+
+        q_values = [self.q_val_no_action, self.q_val_jump, self.q_val_crouch, self.q_val_stand]
+        q_labels = ["None", "Jump", "Crouch", "Stand"]
+        
+        max_q_index = np.argmax(q_values) #para destacar o maior deles
+
+        bar_max_width = 120
+        bar_height = 12
+        
+        # maior q pra escala das barras
+        max_q = max(abs(max(q_values)), abs(min(q_values)), 0.1) #0.1 para evitar divisão por 0
+
+        for i, (q_val, label) in enumerate(zip(q_values, q_labels)):
+            #label
+            text_color = (255, 255, 0) if i == max_q_index else settings.COLOR_TEXT
+            q_text = small_font.render(f"{label}: {q_val:.2f}", True, text_color)
+            self.screen.blit(q_text, (info_panel.x + 5, y_pos))
+
+            # barra
+            bar_width = abs(q_val) / max_q * bar_max_width
+            bar_color = (0, 255, 0) if q_val >= 0 else (255, 0, 0)
+            bar_x = info_panel.x + 5
+            bar_y = y_pos + line_height - 2
+            #borda
+            pygame.draw.rect(self.screen, (150, 150, 150), (bar_x, bar_y, bar_max_width, bar_height), 1)
+
+            # preenche barra
+            if q_val >= 0:
+                pygame.draw.rect(self.screen, bar_color, (bar_x, bar_y, bar_width, bar_height))
+            else:
+                # For negative values, align to the left
+                pygame.draw.rect(self.screen, bar_color, (bar_x, bar_y, bar_width, bar_height))
+            
+            y_pos += line_height + bar_height + 2  # espaço extra para as barras
+
+        #seção de detecção de obstaculo
+        y_pos += 5 
+        #titulo
+        obs_title = small_font.render("Obstacles:", True, settings.COLOR_TEXT)
+        self.screen.blit(obs_title, (info_panel.x + 5, y_pos))
+        y_pos += line_height
+        
+        # obstaculo terrestre
+        ground_dist = str(round(self.obstacle_detection['ground_distance'])) if self.obstacle_detection['ground_distance'] != float('inf') else "-"
+        ground_text = small_font.render(f"Ground: {ground_dist}", True, settings.COLOR_GROUND_OBSTACLE if self.obstacle_detection['ground_detected'] else settings.COLOR_TEXT)
+        self.screen.blit(ground_text, (info_panel.x + 5, y_pos))
+        y_pos += line_height
+        
+        # obstaculo voador
+        flying_dist = str(round(self.obstacle_detection['flying_distance'])) if self.obstacle_detection['flying_distance'] != float('inf') else "-"
+        flying_text = small_font.render(f"Flying: {flying_dist}", True, settings.COLOR_FLYING_OBSTACLE if self.obstacle_detection['flying_detected'] else settings.COLOR_TEXT)
+        self.screen.blit(flying_text, (info_panel.x + 5, y_pos))
 
     def draw_game(self):
         self.screen.fill(settings.COLOR_SKY)
@@ -260,8 +353,7 @@ class Train(BaseAIGame):
                     
                     pygame.draw.line(self.screen, ray_color, ray_start, ray_end, 2)
 
-        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
-        self.screen.blit(score_text, (10, 10))
+        
 
 
     def reset_game(self):
@@ -286,6 +378,7 @@ class Train(BaseAIGame):
                 break
             self.update_game_state() 
             self.draw_game()        
+            self.draw_info()
             pygame.display.flip()
             self.clock.tick(settings.TRAININGFPS)
 
@@ -296,7 +389,7 @@ class Train(BaseAIGame):
 if __name__ == '__main__':
     pygame.init()
     
-    test_screen = pygame.display.set_mode((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
+    test_screen = pygame.display.set_mode((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), pygame.SRCALPHA)
 
     game_instance = Train(screen=test_screen)
     
