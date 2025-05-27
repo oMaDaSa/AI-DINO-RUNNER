@@ -9,6 +9,7 @@ import dino_game.settings as settings
 import dino_game.game as game
 import dino_game.train_ai as train_ai
 import dino_game.watch_ai as watch_ai
+import dino_game.versus as versus
 import ui.menu as menu
 
 class App:
@@ -27,6 +28,8 @@ class App:
             self.current_game_instance = train_ai.Train(self.screen)
         elif gamemode == "watch":
             self.current_game_instance = watch_ai.Watch(self.screen)
+        elif gamemode == "versus":
+            self.current_game_instance = versus.Versus(self.screen)
         score = self.current_game_instance.run()
         self.current_game_instance = None
 

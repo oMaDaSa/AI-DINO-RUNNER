@@ -11,6 +11,13 @@ class Train(BaseAIGame):
     def __init__(self, screen: pygame.Surface):
         super().__init__(screen)
         self.last_spawn = pygame.time.get_ticks()
+
+        # Slider de velocidade
+        self.speed_multiplier = 1.0
+        self.slider_rect = pygame.Rect(10, 40, 100, 20)
+        self.slider_handle_rect = pygame.Rect(60, 40, 10, 20)
+        self.slider_dragging = False
+        self.training_fps = settings.TRAININGFPS
         
         #População
         self.population_size = settings.POPULATION_SIZE
@@ -219,11 +226,15 @@ class Train(BaseAIGame):
             self.game_over = True
     
     def draw_info(self):
-        #score
-        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
-        self.screen.blit(score_text, (10, 10))
+        super().draw_info() #score
         
         small_font = pygame.font.Font(None, 20)
+
+        # desenha o slider de velocidade
+        pygame.draw.rect(self.screen, settings.COLOR_BUTTON, self.slider_rect)
+        pygame.draw.rect(self.screen, settings.COLOR_TEXT, self.slider_handle_rect)
+        speed_text = self.font.render(f"Speed: {self.speed_multiplier:.1f}x", True, settings.COLOR_TEXT)
+        self.screen.blit(speed_text, (120, 40))
 
         #painel no lado direito
         info_panel = pygame.Rect(settings.SCREEN_WIDTH - 200, 10, 190, 380)
@@ -353,8 +364,7 @@ class Train(BaseAIGame):
                     
                     pygame.draw.line(self.screen, ray_color, ray_start, ray_end, 2)
 
-        
-
+        self.draw_info()
 
     def reset_game(self):
         super().reset_game()
@@ -365,6 +375,27 @@ class Train(BaseAIGame):
             dino.reset()
 
         self.active_dino_count = self.population_size
+
+    def handle_input(self):
+            
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if self.slider_rect.collidepoint(event.pos):
+                    self.slider_dragging = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                self.slider_dragging = False
+            elif event.type == pygame.MOUSEMOTION and self.slider_dragging:
+                mouse_x = event.pos[0]
+                slider_x = max(self.slider_rect.left, min(mouse_x, self.slider_rect.right))
+                self.slider_handle_rect.centerx = slider_x
+                ratio = (slider_x - self.slider_rect.left) / self.slider_rect.width
+                self.speed_multiplier = 0.1 + ratio * 19.9
+                self.training_fps = int(settings.TRAININGFPS * self.speed_multiplier)
 
     def run(self):
         self.running = True
@@ -378,9 +409,8 @@ class Train(BaseAIGame):
                 break
             self.update_game_state() 
             self.draw_game()        
-            self.draw_info()
             pygame.display.flip()
-            self.clock.tick(settings.TRAININGFPS)
+            self.clock.tick(self.training_fps)
 
         self.save_q_table()     
         

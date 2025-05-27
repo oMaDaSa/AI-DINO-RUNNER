@@ -45,18 +45,18 @@ class MainMenu:
         btn_width = 300
         btn_height = 60
         btn_spacing = 20
-        start_y = settings.SCREEN_HEIGHT // 2 - (3 * btn_height + 2 * btn_spacing) // 2
+        start_y = settings.SCREEN_HEIGHT // 2 - (4 * btn_height + 2 * btn_spacing) // 2
 
         self.buttons = [
-            Button("Play", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 0 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("play")),
+            Button("Play", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 0 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, settings.COLOR_BUTTON_HOVER, self.font_medium, lambda: self.select_option("play")),
 
-            Button("Train Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 1 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("train")),
+            Button("Train Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 1 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, settings.COLOR_BUTTON_HOVER, self.font_medium, lambda: self.select_option("train")),
 
-            Button("Watch Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("watch")),
+            Button("Watch Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 2 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, settings.COLOR_BUTTON_HOVER, self.font_medium, lambda: self.select_option("watch")),
 
-            Button("Versus Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 3 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("versus")),
+            Button("Versus Model", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 3 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, settings.COLOR_BUTTON_HOVER, self.font_medium, lambda: self.select_option("versus")),
 
-            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 4 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, (180, 180, 180), self.font_medium, lambda: self.select_option("quit"))
+            Button("Quit", settings.SCREEN_WIDTH // 2 - btn_width // 2, start_y + 4 * (btn_height + btn_spacing), btn_width, btn_height, settings.COLOR_BUTTON, settings.COLOR_BUTTON_HOVER, self.font_medium, lambda: self.select_option("quit"))
         ]
 
     def select_option(self, option_key: str):
@@ -67,7 +67,7 @@ class MainMenu:
     def draw_main_menu(self):
         #titulo
         title_text = self.font_large.render("Game", True, settings.COLOR_TEXT)
-        title_rect = title_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 4))
+        title_rect = title_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 6))
         self.screen.blit(title_text, title_rect)
 
         #botoes

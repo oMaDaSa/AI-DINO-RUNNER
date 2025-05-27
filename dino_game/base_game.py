@@ -29,12 +29,7 @@ class BaseGame:
         self.obstacles.add(obstacle)
     
     def handle_input(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.running = False
+        pass
 
     def update_game_state(self):
         if self.game_over:
@@ -53,7 +48,13 @@ class BaseGame:
             self.spawn_obstacle()
             self.obstacle_spawn_timer = 0
 
+    def draw_info(self):
+        #score
+        score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
+        self.screen.blit(score_text, (10, 10))
+
     def draw_game(self):
+        self.draw_info()
         self.screen.fill(settings.COLOR_SKY)
         pygame.draw.rect(self.screen, settings.COLOR_GROUND, pygame.Rect(0, settings.GROUND_LEVEL, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT - settings.GROUND_LEVEL))
         
@@ -63,22 +64,21 @@ class BaseGame:
         score_text = self.font.render(f"Score: {int(self.score)}", True, settings.COLOR_TEXT)
         self.screen.blit(score_text, (10, 10))
 
-        if self.game_over:
-            overlay = pygame.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 128)) 
-            self.screen.blit(overlay, (0,0))
-
-            game_over_text = self.font.render("Game Over", True, (255,255,255))
-            text_rect = game_over_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 - 30))
-            self.screen.blit(game_over_text, text_rect)
-            
-            final_score_text = self.small_font.render(f"Final Score: {int(self.score)}", True, (255,255,255))
-            score_rect = final_score_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 10))
-            self.screen.blit(final_score_text, score_rect)
-    
+        if self.game_over:    
             self.draw_game_over()
     
     def draw_game_over(self):
+        overlay = pygame.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 128)) 
+        self.screen.blit(overlay, (0,0))
+
+        game_over_text = self.font.render("Game Over", True, (255,255,255))
+        text_rect = game_over_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 - 30))
+        self.screen.blit(game_over_text, text_rect)
+        
+        final_score_text = self.small_font.render(f"Final Score: {int(self.score)}", True, (255,255,255))
+        score_rect = final_score_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 10))
+        self.screen.blit(final_score_text, score_rect)
         restart_text = self.small_font.render("'R' - Restart | ESC - Menu", True, (200,200,200))
         restart_rect = restart_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 50))
         self.screen.blit(restart_text, restart_rect)
