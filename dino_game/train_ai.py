@@ -8,9 +8,10 @@ import math
 import numpy as np
 
 class Train(BaseAIGame):
-    def __init__(self, screen: pygame.Surface):
+    def __init__(self, screen: pygame.Surface, custom_config=None):
         super().__init__(screen)
         self.last_spawn = pygame.time.get_ticks()
+        self.custom_config = custom_config
 
         # Slider de velocidade
         self.speed_multiplier = 1.0
@@ -18,9 +19,11 @@ class Train(BaseAIGame):
         self.slider_handle_rect = pygame.Rect(60, 40, 10, 20)
         self.slider_dragging = False
         self.training_fps = settings.TRAININGFPS
-        
+
         #População
-        self.population_size = settings.POPULATION_SIZE
+        if custom_config: self.population_size = custom_config['POPULATION_SIZE']
+        else: self.population_size = settings.POPULATION_SIZE
+
         self.dinos = pygame.sprite.Group()
         self.active_dino_count = 0
         self.best_dino = None
@@ -41,7 +44,7 @@ class Train(BaseAIGame):
         }
 
         for i in range(self.population_size):
-            alpha = 50 #semi transparente
+            alpha = 70 #semi transparente
             dino = Dino(x = 50, y = settings.GROUND_LEVEL + 60, alpha = alpha, dino_id = i)
             self.dinos.add(dino)
             self.sprites.add(dino)
@@ -131,7 +134,9 @@ class Train(BaseAIGame):
 
             self.current_episode += 1
             self.episodes_this_session += 1
-            self.epsilon = max(settings.EPSILON_MIN, self.epsilon * settings.EPSILON_DECAY)
+            min_epsilon = self.custom_config.get('EPSILON_MIN', settings.EPSILON_MIN) if self.custom_config else settings.EPSILON_MIN
+            decay_rate = self.custom_config.get('EPSILON_DECAY', settings.EPSILON_DECAY) if self.custom_config else settings.EPSILON_DECAY
+            self.epsilon = max(min_epsilon, self.epsilon * decay_rate)
 
             if self.episodes_this_session > 0 and self.episodes_this_session % 50 == 0:
                 self.save_q_table()
@@ -202,7 +207,8 @@ class Train(BaseAIGame):
 
                     if 0 <= dino.last_action < len(current_q_values): # Checagem de segurança
                         old_q_value = current_q_values[dino.last_action]
-                        new_q_value = old_q_value + settings.ALPHA * (actual_reward_for_update - old_q_value)
+                        alpha = self.custom_config.get('ALPHA', settings.ALPHA) if self.custom_config else settings.ALPHA
+                        new_q_value = old_q_value + alpha * (actual_reward_for_update - old_q_value)
                         current_q_values[dino.last_action] = new_q_value
                         self.q_table[dino.last_state] = current_q_values
                     else:

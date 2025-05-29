@@ -114,14 +114,36 @@ class BaseGame:
         return self.score
 
 class BaseAIGame(BaseGame):
-    def __init__(self, screen: pygame.Surface):
+    def __init__(self, screen: pygame.Surface, custom_config=None):
         super().__init__(screen)
         self.q_table = {}
         self.q_table_file = "dino_q_table.json"
         self.distance_bin_edges = np.linspace(0, settings.RAY_LENGTH, settings.DISTANCE_BINS + 1)
+
+        # inicializar parametros
         self.epsilon = settings.EPSILON_INIT
+        self.alpha = settings.ALPHA
+        self.gamma = settings.GAMMA
+        self.epsilon_decay = settings.EPSILON_DECAY
+        self.epsilon_min = settings.EPSILON_MIN
+
         self.current_episode = 0
         self.load_q_table()
+
+        if custom_config:
+            if 'ALPHA' in custom_config:
+                self.alpha = custom_config['ALPHA']
+            if 'GAMMA' in custom_config:
+                self.gamma = custom_config['GAMMA']
+            if 'EPSILON_INIT' in custom_config:
+                self.epsilon = custom_config['EPSILON_INIT']
+            if 'EPSILON_DECAY' in custom_config:
+                self.epsilon_decay = custom_config['EPSILON_DECAY']
+            if 'EPSILON_MIN' in custom_config:
+                self.epsilon_min = custom_config['EPSILON_MIN']
+            if 'POPULATION_SIZE' in custom_config:
+                self.population_size = custom_config['POPULATION_SIZE']
+
 
     def discretize_value(self, value, bin_edges):
         idx = np.digitize(value, bin_edges[1:-1])
@@ -214,6 +236,16 @@ class BaseAIGame(BaseGame):
 
                         except Exception as e:
                             print(f"Erro em Q-table key: {k_str} ou valor: {v_list} ({e})")
+
+                #CARREGA PARAMETROs
+                self.epsilon = data.get("epsilon", settings.EPSILON_INIT)
+                self.current_episode = data.get("total_episodes_trained", 0)
+                training_params = data.get("training_params", {})
+                self.alpha = training_params.get("alpha", settings.ALPHA)
+                self.gamma = training_params.get("gamma", settings.GAMMA)
+                self.epsilon_decay = training_params.get("epsilon_decay", settings.EPSILON_DECAY)
+                self.epsilon_min = training_params.get("epsilon_min", settings.EPSILON_MIN)
+                self.population_size = training_params.get("population_size", settings.POPULATION_SIZE)
                                 
                 self.epsilon = data.get("epsilon", settings.EPSILON_INIT)
                 self.current_episode = data.get("total_episodes_trained", 0) 
@@ -262,7 +294,15 @@ class BaseAIGame(BaseGame):
             data = {
                 "q_table": q_table_str_keys,
                 "epsilon": float(self.epsilon),
-                "total_episodes_trained": int(self.current_episode)
+                "total_episodes_trained": int(self.current_episode),
+                #parametros de trino
+                "training_params": {
+                    "alpha": float(self.alpha),
+                    "gamma": float(self.gamma),
+                    "epsilon_decay": float(self.epsilon_decay),
+                    "epsilon_min": float(self.epsilon_min),
+                    "population_size": int(getattr(self, 'population_size', settings.POPULATION_SIZE))
+                }
             }
 
             with open(self.q_table_file, 'w') as f:
