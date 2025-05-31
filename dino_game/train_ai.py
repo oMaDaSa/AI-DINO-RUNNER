@@ -90,7 +90,7 @@ class Train(BaseAIGame):
         #pega os q_value pra esse estado
         #0 = nada/ 1 = pulo/ 2 = agachar/ 3 = levantar
         default_q_list = [0.0, 0.0, 0.0, 0.0]
-        q_values = list(self.q_table.get(state_tuple, default_q_list))
+        q_values = list(dino.q_table.get(state_tuple, default_q_list))
 
 
         self.q_val_no_action = q_values[0]
@@ -168,54 +168,64 @@ class Train(BaseAIGame):
             if not dino.is_alive:
                 continue
             
-            #stado s' é o estado apos o sprite update
+            # estado s' é o estado apos o sprite update
             dino.cast_rays(self.obstacles)
             state_s_prime = self.get_state(dino)
 
             speed_factor = min(1.0, abs(Obstacle.GLOBAL_SPEED) / 10)
-            # reward = 0.05 + (0.05 * speed_factor) # Recompensa base por sobreviver
-            current_reward = 0.05 + (0.05 * speed_factor) # Renomeado para evitar confusão com 'reward_r'
+            # reward = 0.1 + (0.05 * speed_factor) # Recompensa base por sobreviver
+            current_reward = settings.BASE_SURVIVAL_REWARD + (settings.SPEED_FACTOR_REWARD * speed_factor)
 
-
-            #verifica colisao e aplcia custos
+            #verifica colisao e aplica custos
             collided_this_step = False
             hit_obstacles_sprites = self.check_collisions(dino)
 
             #se colidiu
             if hit_obstacles_sprites:
-                actual_reward_for_update = -settings.COLLISION_COST # Recompensa negativa por colisão
+                current_reward = -settings.COLLISION_COST # Recompensa negativa por colisão
                 collided_this_step = True
             else: #se nao colidiu
-                actual_reward_for_update = current_reward # Usa a recompensa base por sobreviver
                 if dino.last_action == 1: # Custo do Pulo
-                    actual_reward_for_update -= settings.JUMP_COST
-                elif dino.last_action == 2: # Custo de Agachar (Ação 2)
-                    actual_reward_for_update -= settings.CROUCH_COST
-                # Nenhum custo específico para Ação 0 (Manter) ou Ação 3 (Levantar) aqui.
+                    current_reward -= settings.JUMP_COST
+                elif dino.last_action == 2: # Custo de Agachar
+                    current_reward -= settings.CROUCH_COST
 
             # Atualiza o q-learning com (dino.last_state, dino.last_action) como (s, a)
-            # state_s_prime é s', e actual_reward_for_update é r.
+            # state_s_prime é s', e current_reward_for_update é r.
             if dino.last_state is not None and dino.last_action is not None:
                 if collided_this_step: # se colidiu (state_s_prime é terminal)
                     # terminal update: Q(s,a) = Q(s,a) + alpha * (r - Q(s,a))
                     # porque o max_future_q pra um estado terminal é 0
                     
-                    current_q_values_list = list(self.q_table.get(dino.last_state, default_q_list_terminal))
-                    if len(current_q_values_list) < 4: # Garante 4 elementos
-                        current_q_values_list.extend([0.0] * (4 - len(current_q_values_list)))
-                    current_q_values = current_q_values_list[:] # Cópia mutável
+                    current_q_values_list = list(dino.q_table.get(dino.last_state, default_q_list_terminal))
+                    current_q_values = current_q_values_list[:]
 
-                    if 0 <= dino.last_action < len(current_q_values): # Checagem de segurança
-                        old_q_value = current_q_values[dino.last_action]
-                        alpha = self.custom_config.get('ALPHA', settings.ALPHA) if self.custom_config else settings.ALPHA
-                        new_q_value = old_q_value + alpha * (actual_reward_for_update - old_q_value)
-                        current_q_values[dino.last_action] = new_q_value
-                        self.q_table[dino.last_state] = current_q_values
-                    else:
-                        print(f"AVISO: dino.last_action ({dino.last_action}) fora do range para Q-values no estado terminal.")
+                    old_q_value = current_q_values[dino.last_action]
+                    alpha = self.custom_config.get('ALPHA', settings.ALPHA) if self.custom_config else settings.ALPHA
+                    new_q_value = old_q_value + alpha * (current_reward - old_q_value)
+                    current_q_values[dino.last_action] = new_q_value
+                    dino.q_table[dino.last_state] = current_q_values
                     
                 else: # state_s_prime não é terminal
-                    self.update_q_table(dino.last_state, dino.last_action, actual_reward_for_update, state_s_prime)
+                    alpha = self.custom_config.get('ALPHA', settings.ALPHA) if self.custom_config else settings.ALPHA
+                    gamma = self.custom_config.get('GAMMA', settings.GAMMA) if self.custom_config else settings.GAMMA
+                    default_q_list = [0.0, 0.0, 0.0, 0.0]
+
+                    current_q_values_from_table = dino.q_table.get(dino.last_state, default_q_list)
+                    current_q_values = list(current_q_values_from_table)
+                    dino.q_table[dino.last_state] = current_q_values
+
+                    old_q_value = current_q_values[dino.last_action]
+                    
+                    next_q_values_from_table = dino.q_table.get(state_s_prime, default_q_list)
+                    next_q_values = list(next_q_values_from_table)
+                    dino.q_table[state_s_prime] = next_q_values 
+                    
+                    max_future_q = np.max(next_q_values)
+                    
+                    new_q_value = old_q_value + alpha * (current_reward + gamma * max_future_q - old_q_value)
+                    current_q_values[dino.last_action] = new_q_value
+                    dino.q_table[dino.last_state] = current_q_values
 
             # Atualiza histórico do dinossauro
             if collided_this_step:
@@ -231,6 +241,32 @@ class Train(BaseAIGame):
         if self.active_dino_count == 0:
             self.game_over = True
     
+    def reset_game(self):
+        super().reset_game()
+        self.last_spawn = pygame.time.get_ticks()
+
+        # Preparando a q-table base pros novos dinosssauros
+        # Ela é uma cópia da self.q_table que deve armazenar a q-table do melhor dino anterior ou de um arquivo carregado
+        base_q_table = {}
+        if self.q_table: 
+            # itera cada k e seus q-values
+            for state_key, q_value_list in self.q_table.items():
+                # e cria uma nova lista. necessário pois se usarmos .copy, as listas internas ainda apontarão para o mesmo objeto
+                base_q_table[state_key] = list(q_value_list)
+        
+        # reseta cada dinossauro e cria uma cópia da tabela Q base para cada dinossauro
+        for dino in self.dinos:
+            dino.reset()
+
+            new_dino_q_table = {}
+            for state_key, q_value_list in base_q_table.items():
+                new_dino_q_table[state_key] = list(q_value_list)
+
+            dino.q_table = new_dino_q_table
+
+
+        self.active_dino_count = self.population_size
+
     def draw_info(self):
         super().draw_info() #score
         
@@ -372,18 +408,7 @@ class Train(BaseAIGame):
 
         self.draw_info()
 
-    def reset_game(self):
-        super().reset_game()
-        self.last_spawn = pygame.time.get_ticks()
-
-        #reseta dinossauros
-        for dino in self.dinos:
-            dino.reset()
-
-        self.active_dino_count = self.population_size
-
     def handle_input(self):
-            
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False

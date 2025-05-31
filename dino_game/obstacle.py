@@ -9,8 +9,11 @@ class Obstacle(pygame.sprite.Sprite):
         super().__init__()
 
         self.is_flying = is_flying
+        self.is_double = False
 
         if is_flying:
+            if random.randint(0, 1) == 1:
+                self.is_double = True
             self.width = settings.FLYING_OBSTACLE_WIDTH
             self.height = settings.FLYING_OBSTACLE_HEIGHT
         else:
@@ -42,14 +45,12 @@ class Obstacle(pygame.sprite.Sprite):
 
         #destroi se sair da tela
         if self.rect.right < 0 :
-            self.kill
+            self.kill()
     
     def draw(self, surface:pygame.Surface):
         surface.blit(self.image, self.rect)
-
-    def reset(self):
-        self.rect.x = settings.SCREEN_WIDTH + random.randint(50, 200)
-        self.rect.bottom = settings.GROUND_LEVEL
+        if self.is_double:
+            surface.blit(self.image, (self.rect.x + 30, self.rect.y - 60))
 
 if __name__ == '__main__':
     pygame.init()

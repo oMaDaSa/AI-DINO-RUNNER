@@ -57,7 +57,7 @@ class Dino(pygame.sprite.Sprite):
                 'end': (0,0),
                 'hit': False,
                 'distance': float('inf'),
-                'obstacle_type': None  
+                'obstacle_type': None
             })
         
     def cast_rays(self, obstacles):

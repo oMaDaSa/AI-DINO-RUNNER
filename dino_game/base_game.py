@@ -23,10 +23,11 @@ class BaseGame:
         self.obstacle_spawn_timer = 0
 
     def spawn_obstacle(self):
-        is_flying = random.randint(0,1)
+        is_flying = random.randint(0,1)       
         obstacle = Obstacle(is_flying=is_flying)
         self.sprites.add(obstacle)
         self.obstacles.add(obstacle)
+        return is_flying
     
     def handle_input(self):
         pass
@@ -149,30 +150,38 @@ class BaseAIGame(BaseGame):
         idx = np.digitize(value, bin_edges[1:-1])
         return idx
 
-    def get_state(self, dino):
+    def get_state(self, dino: Dino): 
         state_components = []
 
+        min_ground_dist = float('inf')
+        min_flying_dist = float('inf')
+
         for ray in dino.rays:
-            dist = max(0, ray['distance'])
-            distance_bin = self.discretize_value(dist, self.distance_bin_edges)
-            state_components.append(distance_bin)
+            if ray['hit']:
+                if ray['obstacle_type'] == 'ground':
+                    min_ground_dist = min(min_ground_dist, ray['distance'])
+                elif ray['obstacle_type'] == 'flying':
+                    if ray['distance'] < min_flying_dist:
+                        min_flying_dist = ray['distance']
+        
+        actual_ground_dist = min(min_ground_dist, settings.RAY_LENGTH)
+        actual_flying_dist = min(min_flying_dist, settings.RAY_LENGTH)
 
-            # (0: nenhum obstaculo, 1: obstaculo terreste, 2: obstaculo voador)
-            if not ray['hit']:
-                obstacle_type_value = 0
-            elif ray['obstacle_type'] == 'ground':
-                obstacle_type_value = 1
-            elif ray['obstacle_type'] == 'flying':
-                obstacle_type_value = 2
-            else:
-                obstacle_type_value = 0  # Default
-            
-            state_components.append(obstacle_type_value)
-
+        ground_dist_bin = self.discretize_value(max(0, actual_ground_dist), self.distance_bin_edges)
+        flying_dist_bin = self.discretize_value(max(0, actual_flying_dist), self.distance_bin_edges)
+        
+        is_crouching_state = 1 if dino.is_crouching else 0
+        
         dino_vy_bin = self.discretize_value(dino.velocity_y, settings.VELOCITY_BINS)
         game_speed_bin = self.discretize_value(Obstacle.GLOBAL_SPEED, settings.GAME_SPEED_BINS)
         
-        state_components.extend([dino_vy_bin, game_speed_bin])
+        state_components.extend([
+            ground_dist_bin,
+            flying_dist_bin,
+            is_crouching_state,
+            dino_vy_bin,
+            game_speed_bin
+        ])
         return tuple(state_components)
 
     def choose_action(self, state_tuple):
@@ -180,17 +189,19 @@ class BaseAIGame(BaseGame):
         return np.argmax(q_values)
     
     def perform_action(self, dino, action):
-        # executa a ação escolhida
-        if action == 1: 
-            if dino.is_crouching: 
-                dino.stand()
-            dino.jump()
-        elif action == 2:
+        if action == 1:  # Pula ou levanta e pula
+            if dino.is_crouching:
+                stood_success = dino.stand() # tenta levantar e pular em seguida
+                if stood_success:
+                    dino.jump()
+            else:
+                dino.jump() # Tenta pular
+        elif action == 2: # Agacha
             dino.crouch()
-        elif action == 3: 
-            if dino.is_crouching: 
+        elif action == 3: # Levanta
+            if dino.is_crouching:
                 dino.stand()
-        # ação 0 é não fazer nada
+        # Ação 0 é não fazer nada
     
     def handle_input(self): 
         for event in pygame.event.get():
