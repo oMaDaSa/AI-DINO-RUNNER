@@ -22,26 +22,37 @@ class Obstacle(pygame.sprite.Sprite):
 
         #APARENCIA 
         self.image = pygame.Surface([self.width, self.height])
-        self.image.fill(settings.COLOR_GROUND_OBSTACLE)
+        
         if is_flying:
             self.image.fill(settings.COLOR_FLYING_OBSTACLE)
         else:
             self.image.fill(settings.COLOR_GROUND_OBSTACLE)
 
         #POSICAO
+        rand = random.randint(50, 200)
         self.rect = self.image.get_rect()
-        self.rect.x = settings.SCREEN_WIDTH + random.randint(50, 200) # Spawn fora da tela, com uma variação
+        self.rect.x = settings.SCREEN_WIDTH + rand # Spawn fora da tela, com uma variação
         if is_flying:
             self.altitude = random.choice(settings.FLYING_OBSTACLE_ALTITUDE)
         else:
             self.altitude = 0
 
         self.rect.bottom = settings.GROUND_LEVEL - self.altitude
+
+        if self.is_double: 
+            self.image2 = pygame.Surface([self.width, self.height])
+            self.image2.fill(settings.COLOR_FLYING_OBSTACLE)
+            self.rect2 = self.image2.get_rect()
+            self.rect2.x = settings.SCREEN_WIDTH + rand + 20
+            self.rect2.bottom = settings.GROUND_LEVEL - (self.altitude+60) 
+
         #MOVIMENTACAO
         self.speed = speed
         
     def update(self):
         self.rect.x += Obstacle.GLOBAL_SPEED
+        if self.is_double:
+            self.rect2.x += Obstacle.GLOBAL_SPEED
 
         #destroi se sair da tela
         if self.rect.right < 0 :
@@ -50,7 +61,7 @@ class Obstacle(pygame.sprite.Sprite):
     def draw(self, surface:pygame.Surface):
         surface.blit(self.image, self.rect)
         if self.is_double:
-            surface.blit(self.image, (self.rect.x + 30, self.rect.y - 60))
+            surface.blit(self.image2, (self.rect2.x, self.rect2.y))
 
 if __name__ == '__main__':
     pygame.init()

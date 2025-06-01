@@ -83,10 +83,17 @@ class BaseGame:
         restart_text = self.small_font.render("'R' - Restart | ESC - Menu", True, (200,200,200))
         restart_rect = restart_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 50))
         self.screen.blit(restart_text, restart_rect)
-
         
     def check_collisions(self, dino):
-        hit_obstacles = pygame.sprite.spritecollide(dino, self.obstacles, False, pygame.sprite.collide_rect)
+        hit_obstacles = []
+        for obstacle in self.obstacles:
+            collided = dino.rect.colliderect(obstacle.rect)
+            
+            if not collided and obstacle.is_double:
+                collided = dino.rect.colliderect(obstacle.rect2)
+            
+            if collided:
+                hit_obstacles.append(obstacle)
         return hit_obstacles
 
     def reset_game(self):
@@ -257,9 +264,7 @@ class BaseAIGame(BaseGame):
                 self.epsilon_decay = training_params.get("epsilon_decay", settings.EPSILON_DECAY)
                 self.epsilon_min = training_params.get("epsilon_min", settings.EPSILON_MIN)
                 self.population_size = training_params.get("population_size", settings.POPULATION_SIZE)
-                                
-                self.epsilon = data.get("epsilon", settings.EPSILON_INIT)
-                self.current_episode = data.get("total_episodes_trained", 0) 
+
                 print(f"Q-table carregada.")
             except Exception as e:
                 print(f"Erro ao carregar Q-table: {e}. Criando uma nova.")
